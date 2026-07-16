@@ -177,9 +177,9 @@ def draw_world(surf, game):
 def draw_hud(surf, game):
     cam = game.camera
     ui = max(1.0, cam.h / C.WIN_H)   # HUD scale-up on larger windows
-    pygame.draw.rect(surf, C.COL_HUD_BG, (0, 0, cam.w, int(30 * ui)))
+    pygame.draw.rect(surf, C.COL_HUD_BG, (0, 0, cam.w, int(38 * ui)))
     pygame.draw.rect(surf, C.COL_HUD_BG,
-                     (0, cam.h - int(26 * ui), cam.w, int(26 * ui)))
+                     (0, cam.h - int(34 * ui), cam.w, int(34 * ui)))
     left = "[%s]" % game.mode.upper()
     if game.mode == "build":
         left += "  tool: %s%s" % (game.build.tool,
@@ -192,18 +192,21 @@ def draw_hud(surf, game):
         if t.note:
             info += "  [%s]" % t.note
         left += info
-    text(surf, left, (10, int(7 * ui)), C.COL_HUD_TXT, int(20 * ui))
-    text(surf, game.mode_hints(), (10, cam.h - int(20 * ui)),
-         C.COL_HUD_DIM, int(18 * ui))
+    text(surf, left, (10, int(9 * ui)), C.COL_HUD_TXT, int(26 * ui))
+    hints = game.mode_hints()
+    size = int(24 * ui)
+    while size > 14 and font(size).size(hints)[0] > cam.w - 20:
+        size -= 1
+    text(surf, hints, (10, cam.h - int(26 * ui)), C.COL_HUD_DIM, size)
 
     # transient messages, newest at the top
-    y = int(40 * ui)
+    y = int(50 * ui)
     for msg, expiry in game.messages:
-        text(surf, msg, (cam.w // 2, y), C.COL_MSG, int(22 * ui), center=True)
-        y += int(24 * ui)
+        text(surf, msg, (cam.w // 2, y), C.COL_MSG, int(28 * ui), center=True)
+        y += int(30 * ui)
     # SPAD banner
     for t in game.world.trains:
         if t.spad and (game.time * 2) % 1 < 0.6:
             text(surf, "SIGNAL PASSED AT DANGER - train #%d" % t.id,
-                 (cam.w // 2, cam.h // 2 - 120), C.COL_SPAD, int(30 * ui),
+                 (cam.w // 2, cam.h // 2 - 120), C.COL_SPAD, int(38 * ui),
                  center=True)

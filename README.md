@@ -5,11 +5,16 @@ signals and platforms, dispatch scheduled trains, or take the controls
 yourself.
 
 ```
+python3 -m venv venv
+source venv/bin/activate   # venv\Scripts\activate on Windows
 pip install pygame-ce
 python main.py             # empty world
 python main.py --demo      # small demo layout with two trains
 python main.py mymap.json  # use mymap.json as the save file (loads it if it exists)
 ```
+
+The venv isn't optional on macOS (or most Linux distros): the Homebrew/system
+Python is "externally managed" and refuses a bare `pip install`.
 
 ## Modes (keys 1 / 2 / 3)
 
@@ -58,6 +63,11 @@ load from a typed filename (`.json` is appended if you give no extension) ·
 mouse wheel or `+`/`-` zoom (`0` resets) · middle-drag or arrow keys pan ·
 `F11` fullscreen · the window is resizable, and the HUD text scales up
 with the window height.
+
+On Mac keyboards the function keys default to media keys, so hold **Fn**
+(e.g. Fn+F11) or enable "Use F1, F2, etc. keys as standard function keys"
+in System Settings → Keyboard; macOS may also grab F11 itself for Show
+Desktop.
 
 ## Tests
 ```

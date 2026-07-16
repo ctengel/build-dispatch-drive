@@ -1,15 +1,22 @@
 """Dispatch & Drive — a 2D train game.
 
-Modes: 1 build, 2 operate/dispatch, 3 drive. F5 saves the layout to
-layout.json, F9 loads it. Run: python main.py
+Modes: 1 build, 2 operate/dispatch, 3 drive. F5 saves the layout, F9
+loads it (layout.json by default); Shift+F5/F9 prompt for a filename.
+Run: python main.py [file.json]
 """
 
 import os
 import sys
 
 
+def parse_argv(argv):
+    """First non-flag argument is the save file, if any."""
+    files = [a for a in argv[1:] if not a.startswith("-")]
+    return files[0] if files else None
+
+
 class Game:
-    def __init__(self, headless=False):
+    def __init__(self, headless=False, save_path=None):
         if headless:
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
             os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -27,6 +34,7 @@ class Game:
         from modes.drive import DriveMode
         self._blocks, self._render, self._train_mod, self._C = \
             blocks, render, train_mod, C
+        self.save_path = save_path or C.SAVE_FILE
         self.screen = pygame.display.set_mode((C.WIN_W, C.WIN_H),
                                               pygame.RESIZABLE)
         pygame.display.set_caption("Dispatch & Drive")
@@ -45,6 +53,8 @@ class Game:
         self.messages = []
         self.running = True
         self._panning = False
+        self.prompt = None       # None | "save" | "load"
+        self.prompt_text = ""
 
     # ---- helpers ----
 
@@ -53,8 +63,11 @@ class Game:
                 "drive": self.drive}[self.mode]
 
     def mode_hints(self):
+        if self.prompt is not None:
+            return "type a filename   Enter confirm   Esc cancel"
         return self.mode_obj().hints + \
-            "   |   1/2/3 mode  F5 save  F9 load  F11 fullscreen  +/- zoom"
+            "   |   1/2/3 mode  F5 save  F9 load  Shift+F5/F9 save/load as" \
+            "  F11 fullscreen  +/- zoom"
 
     def msg(self, s):
         self.messages.append((s, self.time + 2.5))
@@ -84,26 +97,48 @@ class Game:
         self._fullscreen = not self._fullscreen
         self.camera.w, self.camera.h = self.screen.get_size()
 
-    def save(self):
+    def save(self, path=None):
+        path = path or self.save_path
         try:
-            self.world.save(self._C.SAVE_FILE)
-            self.msg("saved to " + self._C.SAVE_FILE)
+            self.world.save(path)
+            self.save_path = path
+            self.msg("saved to " + path)
         except OSError as e:
             self.msg("save failed: %s" % e)
 
-    def load(self):
-        if not os.path.exists(self._C.SAVE_FILE):
-            self.msg("no save file (%s)" % self._C.SAVE_FILE)
+    def load(self, path=None):
+        path = path or self.save_path
+        if not os.path.exists(path):
+            self.msg("no save file (%s)" % path)
             return
         try:
-            warnings = self.world.load(self._C.SAVE_FILE)
+            warnings = self.world.load(path)
         except (OSError, ValueError, KeyError) as e:
             self.msg("load failed: %s" % e)
             return
+        self.save_path = path
         self.selected = None
         for wmsg in warnings[:3]:
             self.msg(wmsg)
-        self.msg("loaded " + self._C.SAVE_FILE)
+        self.msg("loaded " + path)
+
+    def open_prompt(self, kind):
+        self.prompt, self.prompt_text = kind, ""
+        pygame.key.start_text_input()
+
+    def close_prompt(self):
+        self.prompt = None
+        pygame.key.stop_text_input()
+
+    def confirm_prompt(self):
+        name, kind = self.prompt_text.strip(), self.prompt
+        self.close_prompt()
+        if not name:
+            self.msg("cancelled (empty filename)")
+            return
+        if not os.path.splitext(name)[1]:
+            name += ".json"
+        (self.save if kind == "save" else self.load)(name)
 
     # ---- main loop pieces ----
 
@@ -111,6 +146,16 @@ class Game:
         for ev in events:
             if ev.type == pygame.QUIT:
                 self.running = False
+            elif self.prompt is not None:
+                if ev.type == pygame.TEXTINPUT:
+                    self.prompt_text += ev.text
+                elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                    self.close_prompt()
+                elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_BACKSPACE:
+                    self.prompt_text = self.prompt_text[:-1]
+                elif ev.type == pygame.KEYDOWN and ev.key in (
+                        pygame.K_RETURN, pygame.K_KP_ENTER):
+                    self.confirm_prompt()
             elif ev.type == pygame.KEYDOWN and ev.key in (
                     pygame.K_1, pygame.K_2, pygame.K_3):
                 self.mode = {pygame.K_1: "build", pygame.K_2: "operate",
@@ -118,9 +163,15 @@ class Game:
                 if self.selected is not None:
                     self.selected.throttle = 0
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_F5:
-                self.save()
+                if ev.mod & pygame.KMOD_SHIFT:
+                    self.open_prompt("save")
+                else:
+                    self.save()
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_F9:
-                self.load()
+                if ev.mod & pygame.KMOD_SHIFT:
+                    self.open_prompt("load")
+                else:
+                    self.load()
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.selected = None
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_F11:
@@ -153,7 +204,9 @@ class Game:
                 self.mode_obj().handle_event(self, ev)
 
         keys = pygame.key.get_pressed()
-        if self.mode != "drive":
+        if self.prompt is not None:
+            pass
+        elif self.mode != "drive":
             pan = 500 * dt
             if keys[pygame.K_LEFT]:
                 self.camera.pan_pixels(pan, 0)
@@ -188,10 +241,13 @@ class Game:
 
 
 if __name__ == "__main__":
-    game = Game(headless="--headless" in sys.argv)
+    game = Game(headless="--headless" in sys.argv,
+                save_path=parse_argv(sys.argv))
     if "--demo" in sys.argv:
         import demo
         demo.build(game.world)
         game.mode = "operate"
         game.msg("demo layout - select train #2 and press G")
+    elif parse_argv(sys.argv) and os.path.exists(game.save_path):
+        game.load()
     game.run()

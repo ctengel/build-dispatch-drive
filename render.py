@@ -204,6 +204,19 @@ def draw_hud(surf, game):
     for msg, expiry in game.messages:
         text(surf, msg, (cam.w // 2, y), C.COL_MSG, int(28 * ui), center=True)
         y += int(30 * ui)
+    # filename prompt (Shift+F5 save as / Shift+F9 load from)
+    if game.prompt is not None:
+        caret = "_" if (game.time * 2) % 1 < 0.6 else " "
+        label = ("Save as: " if game.prompt == "save" else "Load from: ") \
+            + game.prompt_text + caret
+        size = int(30 * ui)
+        w, h = font(size).size(label)
+        box = pygame.Rect(0, 0, max(w + int(40 * ui), int(360 * ui)),
+                          h + int(24 * ui))
+        box.center = (cam.w // 2, cam.h // 3)
+        pygame.draw.rect(surf, C.COL_HUD_BG, box)
+        pygame.draw.rect(surf, C.COL_HUD_DIM, box, 1)
+        text(surf, label, box.center, C.COL_HUD_TXT, size, center=True)
     # SPAD banner
     for t in game.world.trains:
         if t.spad and (game.time * 2) % 1 < 0.6:

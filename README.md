@@ -6,8 +6,9 @@ yourself.
 
 ```
 pip install pygame-ce
-python main.py          # empty world
-python main.py --demo   # small demo layout with two trains
+python main.py             # empty world
+python main.py --demo      # small demo layout with two trains
+python main.py mymap.json  # use mymap.json as the save file (loads it if it exists)
 ```
 
 ## Modes (keys 1 / 2 / 3)
@@ -50,7 +51,9 @@ red signals and continue when they clear. A *driven* train that passes a red
 is force-stopped and flagged **SIGNAL PASSED AT DANGER**.
 
 ## Everywhere
-`F5` save layout + trains to `layout.json` · `F9` load ·
+`F5` save layout + trains to the current file (`layout.json` unless one was
+given on the command line) · `F9` load · `Shift+F5`/`Shift+F9` save as /
+load from a typed filename (`.json` is appended if you give no extension) ·
 mouse wheel or `+`/`-` zoom (`0` resets) · middle-drag or arrow keys pan ·
 `F11` fullscreen · the window is resizable, and the HUD text scales up
 with the window height.

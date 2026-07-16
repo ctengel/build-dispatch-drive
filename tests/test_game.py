@@ -6,6 +6,7 @@ Run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python tests/test_game.py
 
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -13,13 +14,17 @@ os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 import pygame
 
-from main import Game
+from main import Game, parse_argv
 
 DT = 1 / 60
 
 
-def key(k):
-    return pygame.event.Event(pygame.KEYDOWN, key=k)
+def key(k, mod=0):
+    return pygame.event.Event(pygame.KEYDOWN, key=k, mod=mod)
+
+
+def txt(s):
+    return pygame.event.Event(pygame.TEXTINPUT, text=s)
 
 
 def mouse(game, type_, wx, wy, button=1):
@@ -45,6 +50,11 @@ def drag(game, points):
 
 
 def main():
+    # --- CLI parsing ---
+    assert parse_argv(["main.py"]) is None
+    assert parse_argv(["main.py", "--headless", "a.json"]) == "a.json"
+    assert Game(headless=True, save_path="a.json").save_path == "a.json"
+
     game = Game(headless=True)
     game.camera.cx, game.camera.cy = 8.0, 4.0
     game.camera.scale = 40.0
@@ -72,11 +82,52 @@ def main():
     assert game.world.signals, "signal not placed"
 
     # --- save / load round trip through the UI keys ---
+    assert game.save_path == game._C.SAVE_FILE
     game.step(DT, [key(pygame.K_F5)])
     assert os.path.exists("layout.json")
     before = game.world.to_dict()
     game.step(DT, [key(pygame.K_F9)])
     assert game.world.to_dict() == before
+
+    # --- save as / load from via the filename prompt ---
+    base = os.path.join(tempfile.gettempdir(), "ttest_game_layout")
+    if os.path.exists(base + ".json"):
+        os.remove(base + ".json")
+    game.step(DT, [key(pygame.K_F5, mod=pygame.KMOD_SHIFT)])
+    assert game.prompt == "save"
+    game.step(DT, [key(pygame.K_2)])            # swallowed while prompt open
+    assert game.mode == "build" and game.prompt == "save"
+    game.draw()                                  # prompt overlay renders
+    game.step(DT, [txt(base + "x"), key(pygame.K_BACKSPACE)])
+    assert game.prompt_text == base
+    game.step(DT, [key(pygame.K_RETURN)])
+    assert game.prompt is None
+    assert os.path.exists(base + ".json"), "extension not auto-appended"
+    assert game.save_path == base + ".json"
+    # plain F5 now targets the new current file
+    os.remove(base + ".json")
+    game.step(DT, [key(pygame.K_F5)])
+    assert os.path.exists(base + ".json")
+    # Esc cancels without touching save_path
+    game.step(DT, [key(pygame.K_F9, mod=pygame.KMOD_SHIFT)])
+    assert game.prompt == "load"
+    game.step(DT, [key(pygame.K_ESCAPE)])
+    assert game.prompt is None and game.save_path == base + ".json"
+    # loading a nonexistent file leaves save_path unchanged
+    game.step(DT, [key(pygame.K_F9, mod=pygame.KMOD_SHIFT)])
+    game.step(DT, [txt("no_such_file"), key(pygame.K_RETURN)])
+    assert game.save_path == base + ".json"
+    assert game.world.to_dict() == before
+    # empty filename + Enter cancels
+    game.step(DT, [key(pygame.K_F5, mod=pygame.KMOD_SHIFT)])
+    game.step(DT, [key(pygame.K_RETURN)])
+    assert game.prompt is None and game.save_path == base + ".json"
+    # load back through the prompt
+    game.step(DT, [key(pygame.K_F9, mod=pygame.KMOD_SHIFT)])
+    game.step(DT, [txt(base + ".json"), key(pygame.K_RETURN)])
+    assert game.world.to_dict() == before
+    os.remove(base + ".json")
+    game.save_path = game._C.SAVE_FILE
 
     # --- operate mode: spawn, schedule, dispatch ---
     game.step(DT, [key(pygame.K_2)])

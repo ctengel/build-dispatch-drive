@@ -51,7 +51,9 @@ is force-stopped and flagged **SIGNAL PASSED AT DANGER**.
 
 ## Everywhere
 `F5` save layout + trains to `layout.json` · `F9` load ·
-mouse wheel zoom · middle-drag or arrow keys pan.
+mouse wheel or `+`/`-` zoom (`0` resets) · middle-drag or arrow keys pan ·
+`F11` fullscreen · the window is resizable, and the HUD text scales up
+with the window height.
 
 ## Tests
 ```

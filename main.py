@@ -27,8 +27,11 @@ class Game:
         from modes.drive import DriveMode
         self._blocks, self._render, self._train_mod, self._C = \
             blocks, render, train_mod, C
-        self.screen = pygame.display.set_mode((C.WIN_W, C.WIN_H))
+        self.screen = pygame.display.set_mode((C.WIN_W, C.WIN_H),
+                                              pygame.RESIZABLE)
         pygame.display.set_caption("Dispatch & Drive")
+        self._fullscreen = False
+        self._windowed_size = (C.WIN_W, C.WIN_H)
         self.camera = Camera(C.WIN_W, C.WIN_H)
         self.world = World()
         blocks.rebuild(self.world)
@@ -50,7 +53,8 @@ class Game:
                 "drive": self.drive}[self.mode]
 
     def mode_hints(self):
-        return self.mode_obj().hints + "   |   1/2/3 mode  F5 save  F9 load"
+        return self.mode_obj().hints + \
+            "   |   1/2/3 mode  F5 save  F9 load  F11 fullscreen  +/- zoom"
 
     def msg(self, s):
         self.messages.append((s, self.time + 2.5))
@@ -69,6 +73,16 @@ class Game:
                 if not t.dispatch(self.world):
                     t.state = "idle"
                     self.msg("train #%d lost its route" % t.id)
+
+    def toggle_fullscreen(self):
+        if self._fullscreen:
+            self.screen = pygame.display.set_mode(self._windowed_size,
+                                                  pygame.RESIZABLE)
+        else:
+            self._windowed_size = self.screen.get_size()
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        self._fullscreen = not self._fullscreen
+        self.camera.w, self.camera.h = self.screen.get_size()
 
     def save(self):
         try:
@@ -109,6 +123,23 @@ class Game:
                 self.load()
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.selected = None
+            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_F11:
+                self.toggle_fullscreen()
+            elif ev.type == pygame.KEYDOWN and ev.key in (
+                    pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS):
+                self.camera.zoom_at(self.camera.w / 2, self.camera.h / 2, 1.25)
+            elif ev.type == pygame.KEYDOWN and ev.key in (
+                    pygame.K_MINUS, pygame.K_KP_MINUS):
+                self.camera.zoom_at(self.camera.w / 2, self.camera.h / 2,
+                                    1 / 1.25)
+            elif ev.type == pygame.KEYDOWN and ev.key in (
+                    pygame.K_0, pygame.K_KP0):
+                self.camera.zoom_at(self.camera.w / 2, self.camera.h / 2,
+                                    self._C.SCALE_START / self.camera.scale)
+            elif ev.type == pygame.VIDEORESIZE and not self._fullscreen:
+                self.screen = pygame.display.set_mode((ev.w, ev.h),
+                                                      pygame.RESIZABLE)
+                self.camera.w, self.camera.h = self.screen.get_size()
             elif ev.type == pygame.MOUSEWHEEL:
                 mx, my = pygame.mouse.get_pos()
                 self.camera.zoom_at(mx, my, 1.1 ** ev.y)

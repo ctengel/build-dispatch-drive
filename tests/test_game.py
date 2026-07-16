@@ -118,6 +118,34 @@ def main():
     game.step(DT, [key(pygame.K_r)])
     assert t.path[0][2] != heading_before
 
+    # --- keyboard zoom: + / - / 0 ---
+    game.step(DT, [key(pygame.K_1)])  # leave drive mode
+    center = game.camera.screen_to_world(game.camera.w / 2, game.camera.h / 2)
+    scale0 = game.camera.scale
+    game.step(DT, [key(pygame.K_EQUALS)])
+    assert game.camera.scale > scale0, game.camera.scale
+    game.step(DT, [key(pygame.K_MINUS), key(pygame.K_MINUS)])
+    assert game.camera.scale < scale0, game.camera.scale
+    game.step(DT, [key(pygame.K_0)])
+    assert game.camera.scale == game._C.SCALE_START
+    after = game.camera.screen_to_world(game.camera.w / 2, game.camera.h / 2)
+    assert abs(after[0] - center[0]) < 1e-6 and abs(after[1] - center[1]) < 1e-6
+
+    # --- window resize updates screen and camera ---
+    game.step(DT, [pygame.event.Event(pygame.VIDEORESIZE, w=1600, h=1000)])
+    assert game.screen.get_size() == (1600, 1000), game.screen.get_size()
+    assert (game.camera.w, game.camera.h) == (1600, 1000)
+
+    # --- fullscreen toggle keeps camera in sync, restores windowed size ---
+    game.step(DT, [key(pygame.K_F11)])
+    assert game._fullscreen
+    assert (game.camera.w, game.camera.h) == game.screen.get_size()
+    game.draw()  # HUD renders at the fullscreen size
+    game.step(DT, [key(pygame.K_F11)])
+    assert not game._fullscreen
+    assert game.screen.get_size() == (1600, 1000), game.screen.get_size()
+    assert (game.camera.w, game.camera.h) == (1600, 1000)
+
     game.draw()
     print("INTEGRATION TEST PASSED (%d track cells, %d trains)"
           % (len(game.world.tracks), len(game.world.trains)))

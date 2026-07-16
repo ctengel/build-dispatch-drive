@@ -18,7 +18,8 @@ Lay out the railway. The simulation keeps running while you build.
 
 | Key / action | Effect |
 |---|---|
-| `T` + **drag** | Paint track through cells; turn mid-drag to lay curves. Branches laid into an existing cell create a switch. |
+| `T` + **drag** | Paint track through cells; drag at ~45° to lay diagonals, turn mid-drag to lay curves. Branches laid into an existing cell create a switch. |
+| `T` + **Shift+drag** | Rubber-band one straight run from the start cell, snapped to the nearest of the 8 directions (ghost preview); commits on release |
 | `B` | Toggle bridge/tunnel layer — layered track crosses ground track in the same cell without connecting |
 | `S` + click | Place/remove a signal at the nearest track end (it faces trains leaving the cell in that direction) |
 | `P` / `Y` + click | Toggle a platform / yard on a track cell |

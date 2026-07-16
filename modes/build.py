@@ -24,7 +24,8 @@ TOOL_KEYS = {
 class BuildMode:
     name = "build"
     hints = ("T track  X delete  S signal  P platform  Y yard  W switch  "
-             "B bridge layer  drag to paint  right-click throw switch")
+             "B bridge layer  drag to paint  Shift+drag straight  "
+             "right-click throw switch")
 
     def __init__(self):
         self.tool = "track"
@@ -35,6 +36,9 @@ class BuildMode:
         self.entry = None        # direction the paint path entered last_cell from
         self.edited = set()
         self.done_cells = set()  # per-drag guard for delete/platform/yard
+        self.lining = False      # Shift+drag: rubber-band a straight run
+        self.line_start = None
+        self.line_wpos = None
 
     # ---- events ----
 
@@ -42,6 +46,7 @@ class BuildMode:
         if ev.type == pygame.KEYDOWN:
             if ev.key in TOOL_KEYS:
                 self.tool = TOOL_KEYS[ev.key]
+                self.painting = self.lining = False
                 game.msg("tool: " + self.tool)
             elif ev.key == pygame.K_b:
                 self.bridge = not self.bridge
@@ -51,10 +56,16 @@ class BuildMode:
             wpos = game.camera.screen_to_world(*ev.pos)
             cell = (math.floor(wpos[0]), math.floor(wpos[1]))
             if self.tool == "track":
-                self.painting = True
                 self.moved = False
                 self.last_cell = cell
                 self.entry = None
+                shift = (pygame.key.get_mods() | getattr(ev, "mod", 0))
+                if shift & pygame.KMOD_SHIFT:
+                    self.lining = True
+                    self.line_start = cell
+                    self.line_wpos = wpos
+                else:
+                    self.painting = True
             elif self.tool == "delete":
                 self.painting = True
                 self.done_cells = set()
@@ -72,14 +83,22 @@ class BuildMode:
             wpos = game.camera.screen_to_world(*ev.pos)
             if not common.cycle_switch_at(game, wpos):
                 game.msg("no switch here")
-        elif ev.type == pygame.MOUSEMOTION and self.painting:
+        elif ev.type == pygame.MOUSEMOTION and (self.painting or self.lining):
             wpos = game.camera.screen_to_world(*ev.pos)
-            cell = (math.floor(wpos[0]), math.floor(wpos[1]))
-            if self.tool == "track":
-                self._paint_to(game, cell)
+            if self.lining:
+                self.line_wpos = wpos
+            elif self.tool == "track":
+                self._paint_toward(game, wpos)
             elif self.tool == "delete":
+                cell = (math.floor(wpos[0]), math.floor(wpos[1]))
                 self._delete_at(game, cell)
-        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self.painting:
+        elif (ev.type == pygame.MOUSEBUTTONUP and ev.button == 1
+              and (self.painting or self.lining)):
+            if self.lining:
+                n, end = self._snap_line(game.camera.screen_to_world(*ev.pos))
+                if n > 0:
+                    self._paint_to(game, end)
+                self.lining = False
             if self.tool == "track" and self.moved and self.entry is not None:
                 # cap the run with a straight so it ends inside the final cell
                 self._lay(game, self.last_cell, self.entry, opposite(self.entry))
@@ -102,6 +121,44 @@ class BuildMode:
             self.last_cell = (cx + dx, cy + dy)
             self.entry = opposite(d)
             self.moved = True
+
+    def _paint_toward(self, game, wpos):
+        """Step last_cell toward the mouse point by nearest cell center, so a
+        drag at ~45 degrees lays diagonals instead of a staircase."""
+        guard = 0
+        while guard < 256:
+            guard += 1
+            cx, cy = self.last_cell
+            best_d = None
+            best = math.hypot(cx + 0.5 - wpos[0], cy + 0.5 - wpos[1])
+            for d in range(8):
+                dx, dy = DELTA[d]
+                dist = math.hypot(cx + dx + 0.5 - wpos[0],
+                                  cy + dy + 0.5 - wpos[1])
+                if dist < best:
+                    best_d, best = d, dist
+            if best_d is None:
+                return
+            self._lay(game, self.last_cell, self.entry, best_d)
+            dx, dy = DELTA[best_d]
+            self.last_cell = (cx + dx, cy + dy)
+            self.entry = opposite(best_d)
+            self.moved = True
+
+    def _snap_line(self, wpos):
+        """Snap the drag vector from line_start to the nearest of the 8
+        directions; return (steps, end_cell)."""
+        vx = wpos[0] - (self.line_start[0] + 0.5)
+        vy = wpos[1] - (self.line_start[1] + 0.5)
+        best, best_p = 0, -1.0
+        for d in range(8):
+            dx, dy = DELTA[d]
+            p = (vx * dx + vy * dy) / math.hypot(dx, dy)
+            if p > best_p:
+                best, best_p = d, p
+        dx, dy = DELTA[best]
+        n = max(0, min(200, round(best_p / math.hypot(dx, dy))))
+        return n, (self.line_start[0] + n * dx, self.line_start[1] + n * dy)
 
     def _lay(self, game, cell, entry, exit_d):
         a = entry if entry is not None else opposite(exit_d)
@@ -165,3 +222,12 @@ class BuildMode:
         sx, sy = cam.world_to_screen(cell[0], cell[1])
         s = int(cam.scale)
         pygame.draw.rect(surf, C.COL_GHOST, (sx, sy, s + 1, s + 1), 1)
+        if self.lining and self.line_wpos is not None:
+            n, end = self._snap_line(self.line_wpos)
+            p0 = cam.world_to_screen(self.line_start[0] + 0.5,
+                                     self.line_start[1] + 0.5)
+            p1 = cam.world_to_screen(end[0] + 0.5, end[1] + 0.5)
+            pygame.draw.line(surf, C.COL_GHOST, p0, p1,
+                             max(2, int(cam.scale * 0.08)))
+            ex, ey = cam.world_to_screen(end[0], end[1])
+            pygame.draw.rect(surf, C.COL_GHOST, (ex, ey, s + 1, s + 1), 1)

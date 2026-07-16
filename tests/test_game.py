@@ -14,6 +14,7 @@ os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 import pygame
 
+from geometry import E, NW, SE, W
 from main import Game, parse_argv
 
 DT = 1 / 60
@@ -49,6 +50,16 @@ def drag(game, points):
     game.step(DT, evs)
 
 
+def shift_drag(game, p0, p1):
+    """Simulate a Shift+drag straight-line lay from p0 to p1."""
+    down = pygame.event.Event(pygame.MOUSEBUTTONDOWN,
+                              pos=game.camera.world_to_screen(*p0),
+                              button=1, mod=pygame.KMOD_SHIFT)
+    game.step(DT, [down, mouse(game, pygame.MOUSEMOTION, *p1)])
+    game.draw()  # ghost preview renders mid-drag
+    game.step(DT, [mouse(game, pygame.MOUSEBUTTONUP, *p1)])
+
+
 def main():
     # --- CLI parsing ---
     assert parse_argv(["main.py"]) is None
@@ -72,6 +83,28 @@ def main():
                 (12.5, 6.5), (11.5, 6.5)])
     n_cells = len(game.world.tracks)
     assert n_cells >= 24, n_cells
+
+    # --- diagonals: a slow ~45-degree drag lays diagonal straights ---
+    drag(game, [(20.5 + k * 0.25, 10.5 + k * 0.25) for k in range(17)])
+    for k in range(5):
+        ps = game.world.pieces((20 + k, 10 + k))
+        assert ps and (ps[0].a, ps[0].b) == (SE, NW), (k, ps)
+    assert not game.world.pieces((21, 10)), "staircase cell laid"
+    assert not game.world.pieces((20, 11)), "staircase cell laid"
+
+    # --- Shift+drag: straight run snapped to the nearest of 8 directions ---
+    shift_drag(game, (26.5, 10.5), (30.7, 14.35))  # off-angle, snaps to SE
+    for k in range(5):
+        ps = game.world.pieces((26 + k, 10 + k))
+        assert ps and (ps[0].a, ps[0].b) == (SE, NW), (k, ps)
+    assert not game.world.pieces((27, 10)), "shift line not snapped"
+    shift_drag(game, (20.5, 20.5), (26.4, 20.7))   # near-horizontal, snaps E
+    for x in range(20, 27):
+        ps = game.world.pieces((x, 20))
+        assert ps and (ps[0].a, ps[0].b) == (E, W), (x, ps)
+    before_click = len(game.world.tracks)
+    shift_drag(game, (40.5, 40.5), (40.5, 40.5))   # shift-click lays nothing
+    assert len(game.world.tracks) == before_click
 
     # platform + signal via events
     game.step(DT, [key(pygame.K_p), mouse(game, pygame.MOUSEBUTTONDOWN, 6.5, 3.5),

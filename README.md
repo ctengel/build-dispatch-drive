@@ -16,7 +16,7 @@ python main.py mymap.json  # use mymap.json as the save file (loads it if it exi
 The venv isn't optional on macOS (or most Linux distros): the Homebrew/system
 Python is "externally managed" and refuses a bare `pip install`.
 
-## Modes (keys 1 / 2 / 3)
+## Modes (keys 1 / 2 / 3 / 4)
 
 ### 1 — Build
 Lay out the railway. The simulation keeps running while you build.
@@ -49,6 +49,15 @@ final stop awaiting new orders (one-shot schedule).
 Select a train (`Tab`/click) and take over: `Up`/`W` power, `Down`/`S` brake,
 `Space` emergency stop, `R` reverse (when stopped), `G` hand back to the
 dispatcher to resume its schedule. The camera follows your train.
+
+### 4 — Drive (3D)
+The same controls as Drive, rendered in perspective from the selected
+train (same world, same save file). `C` toggles between the cab (first
+person) and chase (third person) camera; `E` throws the first facing
+switch ahead of the train. With no train selected you get an overview
+of the layout — `Tab` to select one. Trains are plain rectangular
+prisms for now; the mesh format documented in `render3d.py` is the
+hook for loading real 3D models later.
 
 ## Signals
 Automatic block signals: signals divide the track into blocks, and a signal

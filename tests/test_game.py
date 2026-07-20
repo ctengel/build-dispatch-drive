@@ -202,8 +202,27 @@ def main():
     game.step(DT, [key(pygame.K_r)])
     assert t.path[0][2] != heading_before
 
+    # --- 3D drive mode: chase and cab views render while driving ---
+    game.step(DT, [key(pygame.K_4)])
+    assert game.mode == "drive3d" and game.selected is t
+    start = t.head_pos(game.world)
+    pygame.key.get_pressed = lambda: FakeKeys()
+    try:
+        run(game, 1)                       # chase view renders
+        game.step(DT, [key(pygame.K_c)])   # switch to cab view
+        assert game.drive3d.view == "cab"
+        run(game, 0.5)                     # cab view renders
+    finally:
+        pygame.key.get_pressed = real_get_pressed
+    assert t.state == "driven" and t.head_pos(game.world) != start
+    game.step(DT, [key(pygame.K_e)])       # switch-ahead key must not crash
+    game.step(DT, [key(pygame.K_ESCAPE)])  # deselect -> overview camera
+    game.draw()
+    game.step(DT, [key(pygame.K_TAB)])
+    assert game.selected is not None
+
     # --- keyboard zoom: + / - / 0 ---
-    game.step(DT, [key(pygame.K_1)])  # leave drive mode
+    game.step(DT, [key(pygame.K_1)])  # leave 3D drive mode
     center = game.camera.screen_to_world(game.camera.w / 2, game.camera.h / 2)
     scale0 = game.camera.scale
     game.step(DT, [key(pygame.K_EQUALS)])

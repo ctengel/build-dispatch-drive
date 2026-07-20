@@ -22,6 +22,15 @@ FPS = 60
 
 SAVE_FILE = "layout.json"
 
+# --- 3D drive view (mode 4) ---
+FOV_DEG = 70.0
+DRAW_RADIUS_3D = 40.0   # cells drawn around the camera
+CAB_HEIGHT = 0.62       # first-person eye height
+CHASE_BACK = 3.5        # chase camera: cells behind the head
+CHASE_HEIGHT = 2.0      #               height above ground
+CAR_W = 0.30            # train car footprint (cells)
+CAR_H = 0.34            # train car height
+
 # --- colors ---
 COL_BG = (24, 26, 30)
 COL_GRID = (40, 43, 48)
@@ -49,3 +58,6 @@ COL_HUD_TXT = (210, 214, 220)
 COL_HUD_DIM = (130, 134, 140)
 COL_MSG = (255, 230, 140)
 COL_SPAD = (255, 70, 60)
+COL_SKY = (58, 72, 96)
+COL_GROUND = (40, 50, 42)
+COL_BALLAST = (82, 78, 70)

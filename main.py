@@ -1,6 +1,7 @@
 """Dispatch & Drive — a 2D train game.
 
-Modes: 1 build, 2 operate/dispatch, 3 drive. F5 saves the layout, F9
+Modes: 1 build, 2 operate/dispatch, 3 drive, 4 drive in 3D. F5 saves
+the layout, F9
 loads it (layout.json by default); Shift+F5/F9 prompt for a filename.
 Run: python main.py [file.json]
 """
@@ -26,14 +27,17 @@ class Game:
         import blocks
         import config as C
         import render
+        import render3d
         import train as train_mod
         from camera import Camera
         from world import World
         from modes.build import BuildMode
         from modes.operate import OperateMode
         from modes.drive import DriveMode
+        from modes.drive3d import Drive3DMode
         self._blocks, self._render, self._train_mod, self._C = \
             blocks, render, train_mod, C
+        self._render3d = render3d
         self.save_path = save_path or C.SAVE_FILE
         self.screen = pygame.display.set_mode((C.WIN_W, C.WIN_H),
                                               pygame.RESIZABLE)
@@ -46,6 +50,7 @@ class Game:
         self.build = BuildMode()
         self.operate = OperateMode()
         self.drive = DriveMode()
+        self.drive3d = Drive3DMode()
         self.mode = "build"
         self.selected = None
         self.occ = {}
@@ -60,13 +65,13 @@ class Game:
 
     def mode_obj(self):
         return {"build": self.build, "operate": self.operate,
-                "drive": self.drive}[self.mode]
+                "drive": self.drive, "drive3d": self.drive3d}[self.mode]
 
     def mode_hints(self):
         if self.prompt is not None:
             return "type a filename   Enter confirm   Esc cancel"
         return self.mode_obj().hints + \
-            "   |   1/2/3 mode  F5 save  F9 load  Shift+F5/F9 save/load as" \
+            "   |   1/2/3/4 mode  F5 save  F9 load  Shift+F5/F9 save/load as" \
             "  F11 fullscreen  +/- zoom"
 
     def msg(self, s):
@@ -157,9 +162,10 @@ class Game:
                         pygame.K_RETURN, pygame.K_KP_ENTER):
                     self.confirm_prompt()
             elif ev.type == pygame.KEYDOWN and ev.key in (
-                    pygame.K_1, pygame.K_2, pygame.K_3):
+                    pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
                 self.mode = {pygame.K_1: "build", pygame.K_2: "operate",
-                             pygame.K_3: "drive"}[ev.key]
+                             pygame.K_3: "drive",
+                             pygame.K_4: "drive3d"}[ev.key]
                 if self.selected is not None:
                     self.selected.throttle = 0
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_F5:
@@ -206,7 +212,7 @@ class Game:
         keys = pygame.key.get_pressed()
         if self.prompt is not None:
             pass
-        elif self.mode != "drive":
+        elif self.mode not in ("drive", "drive3d"):
             pan = 500 * dt
             if keys[pygame.K_LEFT]:
                 self.camera.pan_pixels(pan, 0)
@@ -217,7 +223,7 @@ class Game:
             if keys[pygame.K_DOWN]:
                 self.camera.pan_pixels(0, -pan)
         else:
-            self.drive.update(self)
+            self.mode_obj().update(self)
 
         self.time += dt
         self.occ = self._train_mod.update_all(self.world, dt, self.time)
@@ -226,8 +232,11 @@ class Game:
             self.selected = None
 
     def draw(self):
-        self._render.draw_world(self.screen, self)
-        self.mode_obj().draw_overlay(self, self.screen)
+        if self.mode == "drive3d":
+            self._render3d.draw_world(self.screen, self, self.drive3d)
+        else:
+            self._render.draw_world(self.screen, self)
+            self.mode_obj().draw_overlay(self, self.screen)
         self._render.draw_hud(self.screen, self)
         pygame.display.flip()
 
